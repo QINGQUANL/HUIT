@@ -1,0 +1,34 @@
+DefaultEnvironment(tools=[])  # don't use the default environment
+
+import os, sys
+APP_PATH = os.path.dirname(os.path.realpath('__file__'))
+BUILD_PATH = os.path.abspath(os.path.join(APP_PATH, '..', '..','build'))
+# to add the path of gcc.py 
+sys.path.append(os.path.abspath(os.path.join(APP_PATH, '..', '..')))
+
+from build.gcc import *
+
+# new a env and export to other script
+env = Environment(ENV=os.environ, tools=cross_compiler_tools, CPPPATH=[])
+# overwrite tool names with our cross compiler tools
+for (tool, name) in cross_compiler_tool_chain:
+    env[tool] = cross_compiler + name
+env.Append(ENV={'PATH': os.environ['PATH']})
+
+env['PROJECT'] = 'library_wizard'
+env['BUILD_PATH'] = BUILD_PATH
+env['OUT_PATH'] = '.out'
+env['LIBS_PATH'] = []
+
+srcs = ['library_main', ]
+libs = []
+include_paths = [APP_PATH]
+ld_file_name  = APP_PATH + os.sep + env['PROJECT']
+output_name = env['OUT_PATH'] + os.sep + env['PROJECT']
+
+objs = env_setup_lib(env, srcs, include_paths)
+lib = env.StaticLibrary(target=output_name, source=objs)
+
+# to install the lib to target, you must figout env['LIBS_PATH'] to some directory ...
+staticInstall = env.Install(env['LIBS_PATH'], lib)
+env.Alias('lib', env['LIBS_PATH'])

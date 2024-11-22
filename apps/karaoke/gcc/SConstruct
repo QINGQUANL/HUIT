@@ -1,0 +1,75 @@
+DefaultEnvironment(tools=[])  # don't use the default environment
+print("COMMAND_LINE_TARGETS is %s" % [str(t) for t in COMMAND_LINE_TARGETS])
+import os, sys
+sys.dont_write_bytecode = True
+
+APP_GCC_PATH = os.path.dirname(os.path.realpath('__file__'))
+sys.path.append(os.path.abspath(os.path.join(APP_GCC_PATH, '..', '..', '..')))
+
+build = ARGUMENTS.get('build', 'debug')
+target = ARGUMENTS.get('target', 'evb_board')
+cmd = ARGUMENTS.get('cmd', '')
+
+if build == 'release':
+   BUILD_SEL = 'release'
+else:
+   BUILD_SEL = 'debug'
+lunch_path = os.path.abspath(os.path.join(APP_GCC_PATH, '..')) + os.sep + 'app_config'
+if cmd == 'lunch':
+    dir_name = []
+    dir_name = os.listdir(lunch_path)
+    print('====================================')
+    print('project list:')
+    for item in dir_name:
+        print('%s' % (item))
+    print('====================================')
+    sys.exit(1)
+
+from build.path_rule import rule,walkdir
+from build.gcc import cross_compiler, cross_compiler_tools, cross_compiler_tool_chain
+
+ROOT_PATH, APP_PATH, BUILD_PATH, LIBS_PATH, INC_PATH, PROJECT, OUT_PATH = rule(APP_GCC_PATH)
+
+
+
+
+# new a env and export to other script
+env = Environment(ENV=os.environ, tools=cross_compiler_tools, CPPPATH=[])
+# overwrite tool names with our cross compiler tools
+for (tool, name) in cross_compiler_tool_chain:
+    env[tool] = cross_compiler + name
+env.Append(ENV={'PATH': os.environ['PATH']})
+env['APP_GCC_PATH'] = APP_GCC_PATH
+env['ROOT_PATH'] = ROOT_PATH
+env['APP_PATH'] = APP_PATH
+env['BUILD_PATH'] = BUILD_PATH
+env['LIBS_PATH'] = LIBS_PATH
+env['INC_PATH'] = INC_PATH
+env['PROJECT'] = PROJECT
+env['OUT_PATH'] = OUT_PATH
+env['BOARD'] = target
+env['BUILD_SEL'] = BUILD_SEL
+Export('env')
+
+
+libs_depends_build = [
+    '../../../src/sys/SConstruct.py',
+    '../../../src/hal/SConstruct.py',
+    '../../../src/oal/SConstruct.py',
+    '../../../src/filesystem/SConstruct.py',
+    '../../../src/middleware/SConstruct.py',
+    '../../../src/wakeup/SConstruct.py',
+    '../../../src/rfc/SConstruct.py',
+	'../../../src/g24/SConstruct.py',
+    '../../../src/net/SConstruct.py',
+    #'../../../src/ble52/SConstruct.py',
+    '../../../src/app_framework/karaoke_framework/SConstruct.py',
+    '../../../src/alg/SConstructV1.py',
+	'../../../src/utils/SConstruct.py',
+    #'../../../src/third_party/SConstruct.py',
+]
+
+for bl in libs_depends_build:
+    if os.path.exists(bl): SConscript(bl)
+
+SConscript('SConstruct.py')

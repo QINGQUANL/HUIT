@@ -1,0 +1,20 @@
+库的创建
+
+1、将C源码和头文件放到当前目录下
+2、修改输出名
+	打开SConstruct.py 文件，在out_name= 修改名字，比如
+	out_name=libdemo
+
+3、编译。 进入到当前目录，输入命令 scons  即可。编译完成后会在.out文件夹输出  libdemo.a
+
+库的使用
+
+1、将libDemo.a 拷贝到SDK顶层目录的 libs文件夹（和apps文件夹同一级）
+2、添加依赖。 打开方案编译目录的SConstruct.py, 比如apps\karaoke\gcc\SConstruct.py
+	编辑 libs 选项，添加库引用， 比如，
+	libs = ['karaoke_framework', 'filesystem', 'middleware', 'motion', 'alg', 'g24', 'net',  'rfc', 'wakeup', 'sys', 'hal', 'oal', 'demo']
+
+    注意：输出库为libdemo.a， 但是依赖为demo， 少了'lib'
+	
+3、在源码中使用库相关函数
+	

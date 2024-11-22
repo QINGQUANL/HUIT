@@ -1,0 +1,158 @@
+
+
+AT(.usbd_seg)
+void msc_ep_out_proc()
+{
+    ....	//一些处理
+
+    switch (scsi_ctrl.bot_state)
+    {
+    case USBD_COMP_BOT_IDLE:
+        comp_msc_bot_cbw_decode();
+        break;
+
+    case USBD_COMP_BOT_DATA_OUT:
+        USB_ReadPacket((uint8_t*)scsi_ctrl.bot_data, usb_dev.msc_rx_pkt_size, EP_BULK);
+        if (comp_scsi_process_cmd(scsi_ctrl.cbw.CB) < 0)
+        {
+            comp_msc_bot_send_csw(USBD_COMP_CSW_CMD_FAILED);
+        }
+
+        break;
+
+    default:
+        break;
+    }
+}
+
+AT(.usbd_seg)
+void msc_ep_in_proc()
+{
+    ..... ///一些提前处理
+    switch (scsi_ctrl.bot_state)
+    {
+    case USBD_COMP_BOT_DATA_IN:
+        if (comp_scsi_process_cmd() < 0)
+        {
+            comp_msc_bot_send_csw(USBD_COMP_CSW_CMD_FAILED);
+        }
+        break;
+
+    case USBD_COMP_BOT_SEND_DATA:
+    case USBD_COMP_BOT_LAST_DATA_IN:
+        comp_msc_bot_send_csw(USBD_COMP_CSW_CMD_PASSED);
+        break;
+
+    default:
+        break;
+    }
+}
+
+
+AT(.usbd_seg)
+int8_t comp_scsi_process_cmd()
+{
+    if(g_storageCb && g_storageCb->pre_transmit_cmd) {
+        if(g_storageCb->pre_transmit_cmd(scsi_ctrl.cbw.CB[0])) {
+            return 0;
+        }
+            
+    }
+    switch (scsi_ctrl.cbw.CB[0])
+    {
+    case COMP_SCSI_TEST_UNIT_READY:
+        return comp_scsiI_test_unit_ready();
+
+    case COMP_SCSI_REQUEST_SENSE:
+        return comp_scsi_request_sense();
+    case COMP_SCSI_INQUIRY:
+        return comp_scsi_inquiry();
+
+    case COMP_SCSI_START_STOP_UNIT:
+        return comp_scsi_start_stop_unit();
+
+    case COMP_SCSI_ALLOW_MEDIUM_REMOVAL:
+        return comp_scsi_start_stop_unit();
+
+    case COMP_SCSI_MODE_SENSE6:
+        return comp_scsi_mode_sense6();
+
+    case COMP_SCSI_MODE_SENSE10:
+        return comp_scsi_mode_sense10();
+
+    case COMP_SCSI_READ_FORMAT_CAPACITIES:
+        return comp_scsi_read_format_capacity();
+
+    case COMP_SCSI_READ_CAPACITY10:
+        return comp_scsi_read_capacity10();
+
+    case COMP_SCSI_READ10:
+        return comp_scsi_read10();
+
+    case COMP_SCSI_WRITE10:
+        return comp_scsi_write10();
+
+    case COMP_SCSI_VERIFY10:
+        return comp_scsi_verify10();
+
+    default:
+        comp_scsi_sense_code(COMP_ILLEGAL_REQUEST, COMP_INVALID_CDB);
+        return -1;
+    }
+}
+
+void  comp_msc_bot_cbw_decode()
+{
+    //uint16_t rxcsr1 = readw(M_RXCSR1);
+    int dataLength = readw(M_COUNT0);
+    if (dataLength != 31){
+        //logi("CBW_Decode len is not equal 31,%x", dataLength);
+    }
+    USB_ReadPacket((uint8_t*)&scsi_ctrl.cbw, 31, EP_BULK);
+    //printf_array(scsi_ctrl.cbw.CB, 16);
+    //logi("-");
+
+    scsi_ctrl.csw.dTag = scsi_ctrl.cbw.dTag;
+    scsi_ctrl.csw.dDataResidue = scsi_ctrl.cbw.dDataLength;
+
+    if ((scsi_ctrl.cbw.dSignature != USBD_COMP_BOT_CBW_SIGNATURE) ||
+        (scsi_ctrl.cbw.bLUN > 1) ||
+        (scsi_ctrl.cbw.bCBLength < 1) ||
+        (scsi_ctrl.cbw.bCBLength > 16))
+    {
+
+        comp_scsi_sense_code(COMP_ILLEGAL_REQUEST, COMP_INVALID_CDB);
+
+        scsi_ctrl.bot_status = USBD_COMP_BOT_STATUS_ERROR;
+        comp_msc_bot_abort();
+
+    }
+    else
+    {
+        if (comp_scsi_process_cmd(scsi_ctrl.cbw.CB) < 0)
+        {
+            if (scsi_ctrl.bot_state == USBD_COMP_BOT_NO_DATA)
+            {
+                comp_msc_bot_send_csw(USBD_COMP_CSW_CMD_FAILED);
+            }
+            else
+            {
+                comp_msc_bot_abort();
+            }
+        }
+        else if ((scsi_ctrl.bot_state != USBD_COMP_BOT_DATA_IN) &&
+            (scsi_ctrl.bot_state != USBD_COMP_BOT_DATA_OUT) &&
+            (scsi_ctrl.bot_state != USBD_COMP_BOT_LAST_DATA_IN))
+        {
+            if (scsi_ctrl.bot_data_length > 0)
+            {
+                comp_msc_bot_send_data(scsi_ctrl.bot_data,
+                    scsi_ctrl.bot_data_length);
+            }
+            else if (scsi_ctrl.bot_data_length == 0)
+            {
+                comp_msc_bot_send_csw(USBD_COMP_CSW_CMD_PASSED);
+            }
+        }
+    }
+}

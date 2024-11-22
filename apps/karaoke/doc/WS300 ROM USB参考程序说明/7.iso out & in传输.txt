@@ -1,0 +1,29 @@
+
+/*
+ISO传输相对简单，OUT中断时就是把数据读处来，回调到APP层注册的函数那里，IN时则需要APP填入数据
+*/
+AT(.usbd_seg)
+void iso_in_proc(type_usb_dev* pUsbdev)
+{
+    g_iso_dma_dir = DMA_IN;
+    uint32_t ptrMicBuff;
+    if (g_p_usbd_audio_callback && g_p_usbd_audio_callback->OnPrepareMicData){
+        if(!g_p_usbd_audio_callback->OnPrepareMicData(&ptrMicBuff, &g_micIsoPkSize)) {
+            usb_iso_transfer((uint8_t*)ptrMicBuff,g_micIsoPkSize);
+        }
+    }
+}
+
+AT(.usbd_seg)
+void iso_out_proc(type_usb_dev* pUsbdev)
+{
+    g_iso_dma_dir = DMA_OUT;
+    uint16_t iso_length = USB_GetRxLength(EP_ISOC);
+    g_pcmPlayBuffSize = iso_length;
+    USB_ReadPacket((uint8_t*)g_ptrPcmPlayDataBuff, iso_length, EP_ISOC);
+    if(g_p_usbd_audio_callback && g_p_usbd_audio_callback->OnNewPcmReceiveBuff) {
+        g_p_usbd_audio_callback->OnNewPcmReceiveBuff((uint8_t*)g_ptrPcmPlayDataBuff, g_pcmPlayBuffSize);
+    }
+
+    usb_iso_receive_prepare((uint8_t*)g_ptrPcmPlayDataBuff,g_pcmPlayBuffSize);
+}

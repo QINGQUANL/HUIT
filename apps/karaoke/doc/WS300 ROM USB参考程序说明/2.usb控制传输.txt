@@ -1,0 +1,196 @@
+/*
+下面的函数为ROM代码
+
+*/
+
+//通过调用次函数可以注册一些回调到APP层
+void usbd_register_setup_event(SetupEventCallback* setupEventCb)
+{
+    g_setupEventCallback = setupEventCb;
+}
+
+
+/*
+OnEp0_pre_setup为setup的预处理函数
+OnEp0_setup_processed 为后处理函数
+
+通常，用户比较关心标准枚举和类枚举，
+在类处理函数class_setup中，要求用户要实现设置好相关的接口号，代码才能够得到正确执行
+*/
+AT(.usbd_seg)
+void ep0_setup()
+{   
+    if(g_setupEventCallback) {
+        if(g_setupEventCallback->OnEp0_pre_setup){
+            if(g_setupEventCallback->OnEp0_pre_setup()){
+                return;
+            }
+        }
+    }
+
+    ........  	//此处为一些寄存器与状态处理
+
+
+	if ((setupReq.bmRequest & 0x60) == 0x20){
+		//class
+		ret = class_setup();
+	}
+	else{
+		ret = standard_setup();
+	}
+    
+	........ //此处为一些状态处理
+
+    if(g_setupEventCallback) {
+        if(g_setupEventCallback->OnEp0_setup_processed){
+            g_setupEventCallback->OnEp0_setup_processed(ret);
+        }
+    }
+    
+}
+
+//标准setup请求处理流程
+BOOL standard_setup()
+{
+    if(g_setupEventCallback){
+        if(g_setupEventCallback->OnPreStandardSetupProcess) {
+            if(g_setupEventCallback->OnPreStandardSetupProcess()){
+                return TRUE;
+            }
+        }
+    }
+    
+    switch (setupReq.bRequest)
+    {
+    case USB_REQ_SET_FEATURE:
+        return standard_req_set_feature();
+
+    case USB_REQ_CLEAR_FEATURE:
+        return standard_req_clear_feature();
+    case USB_REQ_GET_STATUS:
+        return standard_req_get_status();
+    case USB_REQ_SET_ADDRESS:     //Set Address
+        return usb_ep0_set_address();
+    case USB_REQ_GET_DESCRIPTOR:     //Get Descriptor
+        return usb_ep0_get_descriptor();
+    case USB_REQ_GET_CONFIGURATION:     //Get Configuration
+        return usb_ep0_get_configuration();
+    case USB_REQ_SET_CONFIGURATION:     //Set Configuration
+        return usb_ep0_set_configuration();
+    case USB_REQ_GET_INTERFACE:     //Get Interface
+        return usb_ep0_get_interface();
+    case USB_REQ_SET_INTERFACE:     //Set Interface
+        if(g_setupEventCallback) {
+            if(g_setupEventCallback->OnSetInterface) {
+                g_setupEventCallback->OnSetInterface();
+            }
+        }
+        return usb_ep0_set_interface();
+    default:
+        break;
+    }
+
+    return FALSE;
+}
+
+//类处理函数
+BOOL class_setup()
+{
+    switch (setupReq.bmRequest & USB_REQ_RECIPIENT_MASK){
+    case USB_REQ_RECIPIENT_INTERFACE:
+        {
+            uint8_t index = setupReq.wIndex & 0xFF;
+            //logi("class_setup index %x",index);
+            if(index == g_interfaceIndex.msc_index){
+                return (msc_setup());
+            }else if(index == g_interfaceIndex.hid_index){
+                return (usbd_hid_setup());
+            } else {
+                return (audio_setup());
+            }
+        }
+        break;    //USB_REQ_RECIPIENT_INTERFACE
+    case USB_REQ_RECIPIENT_ENDPOINT:
+        switch (setupReq.wIndex & 0xFF){
+        case COMP_MSC_EPOUT_ADDR:
+        case COMP_MSC_EPIN_ADDR:
+            return (msc_setup());
+        case COMP_AUDIO_IN_EP:
+        case COMP_AUDIO_OUT_EP:
+            return (audio_setup());
+        case COMP_HID_EPIN_ADDR:
+            return (usbd_hid_setup());
+        } //switch(setupReq.wIndex & 0xFF)
+        break;    //USB_REQ_RECIPIENT_ENDPOINT
+    }
+    return FALSE;
+}
+
+bool usb_ep0_get_descriptor()
+{
+    uint8_t* pDescBuf;
+    uint16_t descLength;
+    switch (USB_REQUEST_DESCRIPTOR_TYPE) {       //Request Descriptor Type
+    case USB_DESC_TYPE_DEVICE:
+        pDescBuf = COMP_Desc.GetDeviceDescriptor(&descLength);
+        return usb_ep0_descriptor(pDescBuf, descLength);
+    case USB_DESC_TYPE_CONFIGURATION:
+        pDescBuf = (uint8_t*)&pUsb_CfgDesc[0];
+        logi("get config %d",s_configDescriptorLength);
+        return usb_ep0_descriptor(pDescBuf, s_configDescriptorLength);
+    case USB_DESC_TYPE_STRING:
+        switch (USB_REQUEST_DESCRIPTOR_INDEX) {
+        case 0:
+            pDescBuf = COMP_Desc.GetLangIDStrDescriptor(&descLength);
+            break;
+        case USBD_IDX_MFC_STR:
+            pDescBuf = COMP_Desc.GetManufacturerStrDescriptor(&descLength);
+            break;
+        case USBD_IDX_PRODUCT_STR:
+            pDescBuf = COMP_Desc.GetProductStrDescriptor(&descLength);
+            break;
+        case USBD_IDX_SERIAL_STR:
+            pDescBuf = COMP_Desc.GetSerialStrDescriptor(&descLength);
+            break;
+        case USBD_IDX_CONFIG_STR:
+            pDescBuf = COMP_Desc.GetConfigurationStrDescriptor(&descLength);
+            break;
+        case USBD_IDX_INTERFACE_STR:
+            pDescBuf = COMP_Desc.GetInterfaceStrDescriptor(&descLength);
+            break;
+        default:
+            if(COMP_Desc.GetOtherStrDescriptor != NULL) {
+                pDescBuf = COMP_Desc.GetOtherStrDescriptor(&descLength);
+                break;
+            }
+            return FALSE;
+        }
+        return usb_ep0_descriptor(pDescBuf, descLength);
+    case USB_DESC_TYPE_HID_REPORT:  //HID report
+        if(COMP_Desc.GetHidReportDescriptor != NULL) {
+            pDescBuf = COMP_Desc.GetHidReportDescriptor(&descLength);
+            usb_ep0_descriptor(pDescBuf, descLength);
+        } else {
+            if (g_enableEqCtrl) {
+                usb_ep0_descriptor(COMP_HID_Custom_Report_Desc, 33);
+            }
+            else{
+                usb_ep0_descriptor((char *)COMP_HID_Media_Ctrl_ReportDesc, 33);
+            }
+        }
+        
+        break;
+        //case INTERFACE_DESCRIPTOR:
+        //case ENDPOINT_DESCRIPTOR:
+        //case USB_DESC_TYPE_DEVICE_QUALIFIER:
+    default:
+        if(COMP_Desc.GetUnProcessDescriptor) {
+            pDescBuf  = COMP_Desc.GetUnProcessDescriptor(USB_REQUEST_DESCRIPTOR_TYPE,&descLength);
+            usb_ep0_descriptor(pDescBuf, descLength);
+        } else {
+            return FALSE;
+        }
+    }
+
+    return FALSE;
+}

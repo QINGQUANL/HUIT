@@ -1,0 +1,150 @@
+1）1拖1单声道 + AFC 单向
+	dongle:
+		#define AUDIO_MIC_AFC                       1		//afc功能打开
+		#define AUDIO_G24_TX_ENCODER_DISABLE        1		//0 -> 1	因为dongle不支持发送
+		#define AUDIO_G24_TX_ENCODER_NUM            1		//2 -> 1	编码器减少1个
+		#define G24_DUAL_CHANNEL                    0		//1拖1
+		#define LC3_ENC_CH                          1		//LC3单声道编码
+		#define LC3_DEC_CH                          1		//LC3单声道解码
+		#define AUDIO_EFFECT_FDNREV_STEREO			0		//立体声混响关闭
+		#define AUDIO_KARAOKE_MIC_EN                0		//关闭dongle本地MIC
+		
+	handset:
+		#define AUDIO_G24_RX_DECODER_DISABLE        1		//关闭G24的接收
+		#define G24_DUAL_CHANNEL                    0
+		#define AUDIO_EFFECT_FDNREV_STEREO			0		//立体声混响关闭
+		
+		
+2）1拖1立体声
+	dongle:
+		#define AUDIO_MIC_AFC                       0		//afc功能关闭
+		#define AUDIO_G24_TX_ENCODER_DISABLE        0		
+		#define AUDIO_G24_TX_ENCODER_NUM            1		//2 -> 1	编码器减少1个
+		#define LC3_ENC_CH                          2		//LC3单声道编码
+		#define LC3_DEC_CH                          2		//LC3单声道解码
+		#define G24_DUAL_CHANNEL                    0		//1拖1
+		
+	hanset: 
+	
+		#define AUDIO_G24_TX_ENCODER_DISABLE        0
+		#define AUDIO_G24_RX_DECODER_DISABLE        0
+		#define LC3_ENC_CH                          2		//LC3单声道编码
+		#define LC3_DEC_CH                          2		//LC3单声道解码
+		#define G24_DUAL_CHANNEL                    0	//1拖1
+		
+3）1拖2单声道2次传输124.8kbps
+	dongle:
+		#define G24_DUAL_AUDIO_LONG_PACKET_4TIMES   0       //使用音频通路实现的长包4次传输,延时增加20ms
+		#define G24_DUAL_SHORT_PACKET_3TIMES        0       //一拖二短包，协议层3次传输
+	hanset: 
+		#define G24_DUAL_AUDIO_LONG_PACKET_4TIMES   0       //使用音频通路实现的长包4次传输,延时增加20ms
+		#define G24_DUAL_SHORT_PACKET_3TIMES        0       //一拖二短包，协议层3次传输
+
+4）1拖多单向立体声
+	dongle:
+		#define LC3_ENC_CH                          2
+		#define LC3_DEC_CH                          2
+		#define AUDIO_G24_RX_DECODER_DISABLE        1
+		#define AUDIO_G24_TX_ENCODER_NUM            1	    //2 -> 1	编码器减少1个
+		#define G24_DEVICE_ROLE                     1       //0:slaver,1:master
+		#define G24_DUAL_CHANNEL                    0       //2.4G 1个dongle对2个handset
+		#define G24_MONITOR_EN                      1       //dongle到handset单向一拖多监听功能
+		#define G24_MONITOR_AUDIO_CH                2       //一拖多传输音频声道数，单声道会增加传输次数
+
+	hanset:
+		#define LC3_ENC_CH                          2
+		#define LC3_DEC_CH                          2
+		#define AUDIO_G24_TX_ENCODER_DISABLE        1
+		#define G24_DEVICE_ROLE                     0       //0:slaver,1:master
+		#define G24_DUAL_CHANNEL                    0       //2.4G 1个dongle对2个handset
+		#define G24_MONITOR_EN                      1       //dongle到handset单向一拖多监听功能
+		#define G24_MONITOR_AUDIO_CH                2       //一拖多传输音频声道数，单声道会增加传输次数
+
+5）1拖多单向单声道
+	dongle:
+		#define LC3_ENC_CH                          1
+		#define LC3_DEC_CH                          1
+		#define AUDIO_G24_RX_DECODER_DISABLE        1
+		#define AUDIO_G24_TX_ENCODER_NUM            1	    //2 -> 1	编码器减少1个
+		#define G24_DEVICE_ROLE                     1       //0:slaver,1:master
+		#define G24_DUAL_CHANNEL                    0       //2.4G 1个dongle对2个handset
+		#define G24_MONITOR_EN                      1       //dongle到handset单向一拖多监听功能
+		#define G24_MONITOR_AUDIO_CH                1       //一拖多传输音频声道数，单声道会增加传输次数
+
+	hanset:
+		#define LC3_ENC_CH                          1
+		#define LC3_DEC_CH                          1
+		#define AUDIO_G24_TX_ENCODER_DISABLE        1
+		#define G24_DEVICE_ROLE                     0       //0:slaver,1:master
+		#define G24_DUAL_CHANNEL                    0       //2.4G 1个dongle对2个handset
+		#define G24_MONITOR_EN                      1       //dongle到handset单向一拖多监听功能
+		#define G24_MONITOR_AUDIO_CH                1       //一拖多传输音频声道数，单声道会增加传输次数
+
+		
+		
+6）1拖多双向，下行立体声，上行单声道
+	dongle:
+		#define LC3_ENC_CH                          2		//编码立体声
+		#define LC3_DEC_CH                          1		//解码单声道
+		#define AUDIO_G24_RX_DECODER_DISABLE        0
+		#define AUDIO_G24_TX_ENCODER_DISABLE        0
+		#define AUDIO_G24_TX_ENCODER_NUM            1	    //2 -> 1	编码器减少1个
+		#define G24_DEVICE_ROLE                     1       //0:slaver,1:master
+		#define G24_DUAL_CHANNEL                    0       //2.4G 1个dongle对2个handset
+		#define G24_MONITOR_EN                      1       //dongle到handset单向一拖多监听功能
+		#define G24_MONITOR_AUDIO_CH                2       //一拖多传输音频声道数，单声道会增加传输次数
+
+	主hanset:
+		#define LC3_ENC_CH                          1		//编码单声道
+		#define LC3_DEC_CH                          2		//解码立体声
+		#define AUDIO_G24_TX_ENCODER_DISABLE        0
+		#define AUDIO_G24_RX_DECODER_DISABLE        0
+		#define G24_DEVICE_ROLE                     0       //0:slaver,1:master
+		#define G24_DUAL_CHANNEL                    0       //2.4G 1个dongle对2个handset
+		#define G24_MONITOR_EN                      1       //dongle到handset单向一拖多监听功能	
+		#define G24_MONITOR_MASTER_EN				1		//主MIC
+		#define G24_MONITOR_AUDIO_CH                2       //一拖多传输音频声道数，单声道会增加传输次数
+
+	副hanset:
+		#define LC3_ENC_CH                          1		//这个值先写1
+		#define LC3_DEC_CH                          2		//解码立体声
+		#define AUDIO_G24_TX_ENCODER_DISABLE        1		//没有发送功能
+		#define G24_DEVICE_ROLE                     0       //0:slaver,1:master
+		#define G24_DUAL_CHANNEL                    0       //2.4G 1个dongle对2个handset
+		#define G24_MONITOR_EN                      1       //dongle到handset单向一拖多监听功能	
+		#define G24_MONITOR_MASTER_EN		    	0		//主MIC
+		#define G24_MONITOR_AUDIO_CH                2       //一拖多传输音频声道数，单声道会增加传输次数
+
+7）1拖多双向单声道
+	dongle:
+		#define LC3_ENC_CH                          1		//编码单声道
+		#define LC3_DEC_CH                          1		//解码单声道
+		#define AUDIO_G24_RX_DECODER_DISABLE        0
+		#define AUDIO_G24_TX_ENCODER_DISABLE        0
+		#define AUDIO_G24_TX_ENCODER_NUM            1	    //2 -> 1	编码器减少1个
+		#define G24_DEVICE_ROLE                     1       //0:slaver,1:master
+		#define G24_DUAL_CHANNEL                    0       //2.4G 1个dongle对2个handset
+		#define G24_MONITOR_EN                      1       //dongle到handset单向一拖多监听功能
+		#define G24_MONITOR_AUDIO_CH                1       //一拖多传输音频声道数，单声道会增加传输次数
+
+	主hanset:
+		#define LC3_ENC_CH                          1		//编码单声道
+		#define LC3_DEC_CH                          1		//解码立体声
+		#define AUDIO_G24_TX_ENCODER_DISABLE        0
+		#define AUDIO_G24_RX_DECODER_DISABLE        0
+		#define G24_DEVICE_ROLE                     0       //0:slaver,1:master
+		#define G24_DUAL_CHANNEL                    0       //2.4G 1个dongle对2个handset
+		#define G24_MONITOR_EN                      1       //dongle到handset单向一拖多监听功能	
+		#define G24_MONITOR_MASTER_EN				1		//主MIC
+		#define G24_MONITOR_AUDIO_CH                1       //一拖多传输音频声道数，单声道会增加传输次数
+
+	副hanset:
+		#define LC3_ENC_CH                          1		//这个值先写1
+		#define LC3_DEC_CH                          1		//解码立体声
+		#define AUDIO_G24_TX_ENCODER_DISABLE        1		//没有发送功能
+		#define G24_DEVICE_ROLE                     0       //0:slaver,1:master
+		#define G24_DUAL_CHANNEL                    0       //2.4G 1个dongle对2个handset
+		#define G24_MONITOR_EN                      1       //dongle到handset单向一拖多监听功能	
+		#define G24_MONITOR_MASTER_EN		    	0		//主MIC
+		#define G24_MONITOR_AUDIO_CH                1       //一拖多传输音频声道数，单声道会增加传输次数
+

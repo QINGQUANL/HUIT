@@ -1,0 +1,84 @@
+typedef struct MSC_SETUP_PROC
+{
+    BOOL (*msc_standard_setup)();
+    BOOL (*msc_class_setup)();
+}MscSetupProc;
+
+MscSetupProc g_msc_setup_proc = {
+    msc_standard_setup,
+    msc_class_setup
+};
+
+
+AT(.usbd_seg)
+BOOL msc_setup()
+{
+    switch (setupReq.bmRequest & USB_REQ_TYPE_MASK)
+    {
+    case USB_REQ_TYPE_CLASS:
+        return g_msc_setup_proc.msc_class_setup();//msc_class_setup();
+        break;
+    case USB_REQ_TYPE_STANDARD:
+        return g_msc_setup_proc.msc_standard_setup();//msc_standard_setup();
+    default:
+        break;
+    }
+    return FALSE;
+}
+
+//类控制传输请求处理函数
+AT(.usbd_seg)
+BOOL msc_class_setup()
+{
+    switch (setupReq.bRequest)
+    {
+    case COMP_BOT_GET_MAX_LUN:
+        if ((setupReq.wValue == 0) && (setupReq.wLength == 1) && ((setupReq.bmRequest & 0x80) == 0x80))
+        {
+            uint8_t lun = 0;
+            USB_EP0StartTX(&lun, 1);
+
+            scsi_ctrl.bot_state = USBD_COMP_BOT_IDLE;
+            USB_EPnStartRX((uint8_t*)&scsi_ctrl.cbw, 31, EP_BULK);
+            return TRUE;
+        }
+        break;
+
+    case COMP_BOT_RESET:
+        if ((setupReq.wValue == 0) && (setupReq.wLength == 0) && ((setupReq.bmRequest & 0x80) != 0x80))
+        {
+            return usb_ep0_class_reset();
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    return FALSE;
+}
+
+//MSC标准请求
+AT(.usbd_seg)
+BOOL msc_standard_setup()
+{
+    switch (setupReq.bRequest)
+    {
+    case USB_REQ_GET_INTERFACE:
+        logi("bulk get interface");
+        //USBD_CtlSendData ((uint8_t *)&scsi_ctrl.interface,1);
+        break;
+
+    case USB_REQ_SET_INTERFACE:
+        logi("bulk set interface");
+        //scsi_ctrl.interface = (uint8_t)(req->wValue);
+        break;
+
+    case USB_REQ_CLEAR_FEATURE:
+        //--------
+        logi("bulk get interface");
+        comp_msc_bot_clr_feature(EP_BULK);
+        break;
+    }
+    return TRUE;
+}

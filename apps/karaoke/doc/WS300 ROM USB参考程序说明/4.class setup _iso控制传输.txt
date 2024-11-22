@@ -1,0 +1,216 @@
+
+/*
+下面switch的分支均通过注册回调的方式回到APP层
+*/
+AT(.usbd_seg)
+BOOL audio_setup()
+{
+    BOOL ret = TRUE;
+    logi(" %s ++++" , __func__);
+    switch (setupReq.bmRequest & USB_REQ_TYPE_MASK)
+    {
+    case USB_REQ_TYPE_CLASS:
+        switch (setupReq.bRequest)
+        {
+        case COMP_AUDIO_REQ_GET_CUR:
+            comp_audio_req_get_cur();
+            break;
+
+        case COMP_AUDIO_REQ_SET_CUR:
+            comp_audio_req_set_cur();
+            break;
+
+        case COMP_AUDIO_REQ_GET_MIN:
+            comp_audio_req_get_min();
+            break;
+
+        case COMP_AUDIO_REQ_GET_MAX:
+            comp_audio_req_get_max();
+            break;
+
+        case COMP_AUDIO_REQ_GET_RES:
+            comp_audio_req_get_res();
+            break;
+        case COMP_AUDIO_REQ_SET_RES:
+            comp_audio_req_set_res();
+            break;
+        default:
+            ret = FALSE;
+            if(g_p_usbd_audio_callback != NULL) {
+                if(g_p_usbd_audio_callback->ExternAudioCmd) {
+                    ret = g_p_usbd_audio_callback->ExternAudioCmd(&setupReq);
+                }
+            }
+            
+        }
+        break;
+
+    case USB_REQ_TYPE_STANDARD:
+        switch (setupReq.bRequest)
+        {
+        case USB_REQ_GET_DESCRIPTOR:
+            logi("req audio descript");
+            /*if( (setupReq.wValue >> 8) == COMP_AUDIO_DESCRIPTOR_TYPE)
+                  {
+                  pbuf = pUSBD_COMP_CfgDesc + 18;
+                  len = MIN(USB_COMP_AUDIO_DESC_SIZ , setupReq.wLength);
+
+
+                  USBD_CtlSendData (pbuf,len);
+                  }*/
+            break;
+
+        case USB_REQ_GET_INTERFACE:
+            USB_EP0StartTX((uint8_t*)&haudio.alt_setting, 2);
+            break;
+
+        case USB_REQ_SET_INTERFACE:
+            haudio.alt_setting = (uint8_t)(setupReq.wValue);
+            logi("set interface");
+            usb_ep0_setup_end();
+            if(g_p_usbd_audio_callback) {
+                if(g_p_usbd_audio_callback->OnAlternateSettingChange) {
+                    g_p_usbd_audio_callback->OnAlternateSettingChange();
+                }
+            }
+            break;
+
+        default:
+            logi("usb irq error");
+            ret = FALSE;
+        }
+    }
+
+    return ret;
+}
+
+
+AT(.usbd_seg)
+void comp_audio_req_get_cur()
+{
+    uint16_t curVolume = 0xa080;
+    if (g_p_usbd_audio_callback && g_p_usbd_audio_callback->GetCur) {
+        g_p_usbd_audio_callback->GetCur(&haudio.control, &curVolume);
+    }
+
+    usb_ep0buf[0] = curVolume;
+    usb_ep0buf[1] = curVolume >> 8;
+
+    USB_EP0StartTX(usb_ep0buf, setupReq.wLength);
+}
+
+AT(.usbd_seg)
+void comp_audio_req_get_min()
+{
+    uint16_t min = 0xa000;
+    if (g_p_usbd_audio_callback && g_p_usbd_audio_callback->GetMin){
+        g_p_usbd_audio_callback->GetMin(&min);
+    }
+    usb_ep0buf[0] = min;
+    usb_ep0buf[1] = min >> 8;
+    USB_EP0StartTX(usb_ep0buf, setupReq.wLength);
+}
+
+
+/**
+  * @brief  AUDIO_Req_GetMax
+  *         Handles the GET_CUR Audio control request.
+  * @param  pdev: instance
+  * @param  req: setup class request
+  * @retval status
+  */
+AT(.usbd_seg)
+void comp_audio_req_get_max()
+{
+    uint16_t  max = 0xa0f0;
+    if (g_p_usbd_audio_callback && g_p_usbd_audio_callback->GetMax){
+        g_p_usbd_audio_callback->GetMax(&max);
+    }
+
+    usb_ep0buf[0] = max;
+    usb_ep0buf[1] = max >> 8;
+    /* Send the current mute state */
+    USB_EP0StartTX(usb_ep0buf, setupReq.wLength);
+}
+
+/**
+  * @brief  AUDIO_Req_GetRes
+  *         Handles the GET_CUR Audio control request.
+  * @param  pdev: instance
+  * @param  req: setup class request
+  * @retval status
+  */
+AT(.usbd_seg)
+void comp_audio_req_get_res()
+{
+    uint16_t  step = 5;
+    if (g_p_usbd_audio_callback && g_p_usbd_audio_callback->GetRes) {
+        g_p_usbd_audio_callback->GetRes(&step);
+    }
+    usb_ep0buf[0] = step;
+    usb_ep0buf[1] = step >> 8;
+    USB_EP0StartTX(usb_ep0buf, setupReq.wLength);
+}
+
+
+
+/**
+  * @brief  AUDIO_Req_SetCurrent
+  *         Handles the SET_CUR Audio control request.
+  * @param  pdev: instance
+  * @param  req: setup class request
+  * @retval status
+  */
+AT(.usbd_seg)
+void comp_audio_req_set_cur()
+{
+    logi("comp_audio_req_set_cur %d",setupReq.wLength);
+    if (setupReq.wLength)
+    {
+        /* Prepare the reception of the buffer over EP0 */
+        //usb_ep0_rx_ready();
+        //usb_dev.ep0_cur_state = RECEIVING_STATE;
+        haudio.control.cmd = COMP_AUDIO_REQ_SET_CUR;     /* Set the request value */
+        memcpy(&haudio.control.setup_bak, &setupReq,sizeof(setupReq));          /* Set the request data length */
+        USB_EP0StartRX((uint8_t*)haudio.control.data , setupReq.wLength);
+    }
+}
+
+AT(.usbd_seg)
+void comp_audio_req_set_res()
+{
+    if (setupReq.wLength)
+    {
+        /* Prepare the reception of the buffer over EP0 */
+        //usb_ep0_rx_ready();
+        //usb_dev.ep0_cur_state = RECEIVING_STATE;
+        haudio.control.cmd = COMP_AUDIO_REQ_SET_RES;     /* Set the request value */
+        memcpy(&haudio.control.setup_bak, &setupReq,sizeof(setupReq));          /* Set the request data length */
+        USB_EP0StartRX((uint8_t*)haudio.control.data , setupReq.wLength);
+    }
+}
+
+
+AT(.usbd_seg)
+void  usbd_comp_audio_ep0_rx_ready()
+{
+    if(g_p_usbd_audio_callback) {
+        if (haudio.control.cmd == COMP_AUDIO_REQ_SET_CUR) {
+            if (g_p_usbd_audio_callback->SetCur){
+                g_p_usbd_audio_callback->SetCur(&haudio.control);
+            }
+        } else if(haudio.control.cmd == COMP_AUDIO_REQ_SET_RES) {
+            if (g_p_usbd_audio_callback->SetCur){
+                g_p_usbd_audio_callback->SetRes(&haudio.control);
+            }
+        } else {
+            if(g_p_usbd_audio_callback->ExternAudioData) {
+                g_p_usbd_audio_callback->ExternAudioData(&haudio.control);
+            }
+        }
+    }
+    
+    haudio.control.cmd = 0;
+}
+
+

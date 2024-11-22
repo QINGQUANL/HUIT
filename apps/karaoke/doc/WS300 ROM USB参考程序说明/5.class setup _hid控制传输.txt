@@ -1,0 +1,73 @@
+
+
+AT(.usbd_seg)
+BOOL usbd_hid_setup()
+{
+    switch (setupReq.bmRequest & USB_REQ_TYPE_MASK)
+    {
+    case USB_REQ_TYPE_CLASS:
+        return usbd_hid_class_setup();
+        break;
+
+    case USB_REQ_TYPE_STANDARD:
+        return usbd_hid_standard_setup();
+    }
+    return FALSE;
+}
+
+AT(.usbd_seg)
+BOOL usbd_hid_class_setup()
+{
+    BOOL ret = TRUE;
+    switch (setupReq.bRequest)
+    {
+    case COMP_HID_REQ_SET_PROTOCOL:
+        hhid.Protocol = (uint8_t)(setupReq.wValue);
+        usb_ep0_setup_end();
+        break;
+
+    case COMP_HID_REQ_GET_PROTOCOL:
+        USB_EP0StartTX((uint8_t*)&hhid.Protocol, 1);
+        break;
+
+    case COMP_HID_REQ_SET_IDLE:
+        hhid.IdleState = (uint8_t)(setupReq.wValue >> 8);
+        usb_ep0_setup_end();
+        break;
+
+    case COMP_HID_REQ_GET_IDLE:
+        USB_EP0StartTX((uint8_t*)&hhid.IdleState, 1);
+        break;
+    case COMP_HID_REQ_GET_REPORT:
+        //USBD_CtlSendData ((uint8_t *)&HID_Buffer,4);
+        break;
+
+    default:
+        ret = FALSE;
+    }
+
+    return ret;
+}
+
+AT(.usbd_seg)
+BOOL usbd_hid_standard_setup()
+{
+    BOOL ret = TRUE;
+    switch (setupReq.bRequest)
+    {
+    case USB_REQ_GET_DESCRIPTOR:
+        //
+        break;
+    case USB_REQ_GET_INTERFACE:
+        //usb_dev.ep_tx_ptr[0] = hhid.AltSetting;
+        //usb_dev.ep_len[0] = 1;
+        //USB_EP0StartTX(&usb_dev);
+        break;
+
+    case USB_REQ_SET_INTERFACE:
+        //hhid.AltSetting = (uint8_t)(setupReq.wValue);
+        break;
+    }
+
+    return ret;
+}

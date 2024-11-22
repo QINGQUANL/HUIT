@@ -1,0 +1,1 @@
+HAL 硬件抽象层对外接口，提供给middleware 和 apps 里面的程序调用。

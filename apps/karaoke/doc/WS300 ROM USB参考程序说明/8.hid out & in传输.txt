@@ -1,0 +1,7 @@
+
+/*
+HID的数据不超过32BYTE，rom已经设置其最大传输数据为32BYTE
+通过 函数 void hal_pcd_init(PCD_EP_PROC* pcd_ep_proc, PCB_USB_STATE_CB* pcd_usb_state_cb)  中参数 pcd_ep_proc 注册相关的IN OUT处理接口
+使用函数 usbd_hid_send_data  发送数据，数据长度一包不超过32BYTE， 每次数据取走后会触发一个HID IN的中断，需要处理可以在pcd_ep_proc的相关回到中处理
+*/
+

@@ -1,0 +1,115 @@
+
+/*
+以下程序为ROM中代码，仅作为开发参数。不作为应用使用
+
+HAL_PCD_IRQHandler  为所有USB中断的入口函数，通过读取调用USB_ReadCommonInterrupts， USB_ReadRxEpInterrupt， USB_ReadTxEpInterrupt函数获取中断状态，以判断为哪个中断
+其中  readb(USB_INTRUSBE_B)  获取中断使能
+
+当得到中断状态和使能标记后，就可以通过这些状态判断是哪个中断标记起来了，然后再通过相关回调进行相关设置
+1、回调pre_process_isr为预处理
+2、HAL_PCD_SuspendCallback为挂起中断，会通过p_pcd_state_cb->suspend_cb 回调到应用层，实现如下
+	void HAL_PCD_SuspendCallback()
+	{
+		if (p_pcd_state_cb && p_pcd_state_cb->suspend_cb){
+			p_pcd_state_cb->suspend_cb();
+		}
+	}
+
+3、HAL_PCD_ResumeCallback为恢复中断，函数实现如下
+	void HAL_PCD_ResumeCallback()
+	{
+		if (p_pcd_state_cb && p_pcd_state_cb->resume_cb){
+			p_pcd_state_cb->resume_cb();
+		}
+	}
+4、HAL_PCD_SOFCallback位sof中断回调，实现如下
+	void HAL_PCD_SOFCallback()
+	{
+		g_b_sof_received = TRUE;
+		if (p_pcd_state_cb && p_pcd_state_cb->sof_cb){
+			p_pcd_state_cb->sof_cb();
+		}
+	}
+	
+5、bulk_out_proc为 EP1 OUT的处理函数回调	
+6、iso_out_proc 为EP2 OUT的处理回调
+7、hid_out_proc 为EP3 OUT的处理回调
+8、p_pcd_ep_proc->setup 为控制端点的处理回调
+9、bulk_in_proc  为EP1 IN的处理回调
+10、iso_in_proc 为EP2 IN的处理回调
+11、hid_in_proc  为EP3 IN的处理回调
+12、handled_process_isr  为后处理，使用到的机会极少
+	
+*/
+
+AT(.usbd_seg)
+void HAL_PCD_IRQHandler()
+{
+    uint8_t usbIsr = USB_ReadCommonInterrupts();
+    uint16_t usbOutIsr = USB_ReadRxEpInterrupt();
+    uint16_t usbInIsr = USB_ReadTxEpInterrupt();
+
+    uint8_t usbIsr_be = readb(USB_INTRUSBE_B);
+
+    if (p_pcd_isr_cb != NULL){
+        if (p_pcd_isr_cb->pre_process_isr != NULL){
+            p_pcd_isr_cb->pre_process_isr(&usbIsr, &usbOutIsr, &usbInIsr);
+        }
+    }
+
+    if (usbIsr & usbIsr_be & USB_INT_FLAG_D_SUSPEND){
+        HAL_PCD_SuspendCallback();
+    }
+
+    if (usbIsr & usbIsr_be & USB_INT_FLAG_D_RESUME) {
+        HAL_PCD_ResumeCallback();
+    }
+
+    if (usbIsr & usbIsr_be & USB_INT_FLAG_D_RESET){
+        //logi("usb reset");
+        HAL_PCD_ResetCallback();
+    }
+
+    if (usbIsr & usbIsr_be & USB_INT_FLAG_SOF){
+        HAL_PCD_SOFCallback();
+    }
+
+    if (usbOutIsr & (1 << EP_BULK)){
+        p_pcd_ep_proc->bulk_out_proc(&usb_dev);
+    }
+    if (usbOutIsr & (1 << EP_ISOC)){
+        p_pcd_ep_proc->iso_out_proc(&usb_dev);
+    }
+    if (usbOutIsr & (1 << EP_HID)){
+        if (p_pcd_ep_proc->hid_out_proc != NULL){
+            p_pcd_ep_proc->hid_out_proc(&usb_dev);
+        }
+    }
+
+    //----------------------
+    if (usbInIsr & 0x01){    //ep0 in
+        p_pcd_ep_proc->setup(&usb_dev);
+    }
+
+    if (usbInIsr & (1 << EP_BULK)){ //bulk in 
+        p_pcd_ep_proc->bulk_in_proc(&usb_dev);
+    }
+
+    if (usbInIsr & (1 << EP_ISOC)) {   //iso in
+        //logi("ep isoc int");
+        p_pcd_ep_proc->iso_in_proc(&usb_dev);
+    }
+
+    if (usbInIsr & (1 << EP_HID)) {
+        //logi("ep hid int");
+        if (p_pcd_ep_proc->hid_in_proc != NULL){
+            p_pcd_ep_proc->hid_in_proc(&usb_dev);
+        }
+    }
+
+    if (p_pcd_isr_cb != NULL){
+        if (p_pcd_isr_cb->handled_process_isr != NULL){
+            p_pcd_isr_cb->handled_process_isr(usbIsr, usbOutIsr, usbInIsr);
+        }
+    }
+}

@@ -1,0 +1,47 @@
+{
+  "root": {
+    "version": "3",
+
+    "boot":
+    {
+      "ram_addr_write": "0x860000",
+      "ram_addr_run": "0x860001",
+      "boot_addr": "0x60",
+      "norflash": {
+        "norf_line": "0",
+        "norf_baud": "9"
+      },
+      "doDebug": "1",
+      "loader": {
+        "type": "HLKJ",
+        "path": "$(ROOT_PATH)/bootloader/bin/fpga/loader.bin"
+      }
+    },
+
+    "partitions":
+    {
+      "firmware":
+      {
+        "type": "FIRM",
+        "path": "$(ROOT_PATH)/configs/program_wizard/gcc/.out/program_wizard.bin",
+        "loadLength": "0x1000",
+        "loadToRam": "0x804c40",
+        "runFromRam": "0x804c41"
+      },
+
+      "others":
+      [
+
+      ],
+
+      "psm":
+      {
+        "type": "PSMP",
+        "addr":"0xFC000",
+        "length":"0x4000"
+      }
+    }
+
+  }
+}
+
